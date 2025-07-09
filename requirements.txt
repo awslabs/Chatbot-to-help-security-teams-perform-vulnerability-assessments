@@ -1,8 +1,8 @@
 # Core dependencies
 boto3==1.28.38
 opensearch-py==2.2.0
-requests==2.31.0
-streamlit==1.22.0
+requests~>2.32.0
+streamlit~>1.30.0
 
 # Security dependencies
 cryptography>=41.0.7  # For secure cryptographic operations
