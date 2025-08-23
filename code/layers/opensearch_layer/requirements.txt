@@ -1,2 +1,5 @@
 opensearch-py
 requests_aws4auth
+
+# Security vulnerability fix
+requests>=2.32.4
