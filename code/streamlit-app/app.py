@@ -1,77 +1,94 @@
-"""
-Starting script of streamlit app.
-"""
-
+"""Streamlit application with security controls."""
 from datetime import datetime
 import logging
 import json
 import streamlit as st
-
-# from streamlit_chat import message
+from typing import Dict, Any, Optional
 from utils import clear_input, show_empty_container, show_footer
 from connections import Connections
-
+from code.security.middleware import validate_input, error_handler, rate_limit
+from code.security.security_config import SecurityConfig, safe_log, SessionManager
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
-def log(message):
-    logger.info(message)
-
-
+# Initialize connections and session management
 lambda_client = Connections.lambda_client
+session_manager = SessionManager()
 
-
-# agent_id = Connections.agent_id
-# get unique sesion id
-def get_response(user_input, session_id):
+@error_handler
+@rate_limit(max_calls=60, time_window=60)
+@validate_input
+def get_response(user_input: str, session_id: str) -> Dict[str, Any]:
     """
-    Get response from genai Lambda
+    Get response from Lambda with security controls.
+
+    Args:
+        user_input: User's question
+        session_id: Session identifier
+
+    Returns:
+        Lambda response
     """
-    print(f"session id: {session_id}")
-    payload = {"body": {"query": user_input, "session_id": session_id}}
+    try:
+        safe_log(f"Processing request for session: {session_id}")
 
-    lambda_function_name = Connections.lambda_function_name
-    print(f"lambda_function_name: {lambda_function_name}")
-    print(f"payload: {payload}")
+        payload = {
+            "body": {
+                "query": user_input,
+                "session_id": session_id
+            }
+        }
 
-    response = lambda_client.invoke(
-        FunctionName=lambda_function_name,
-        InvocationType="RequestResponse",
-        Payload=json.dumps(payload),
-    )
-    response_output = json.loads(response["Payload"].read().decode("utf-8"))
-    print(f"response_output from genai lambda: {response_output}")
+        lambda_function_name = Connections.lambda_function_name
+        safe_log(f"Invoking lambda: {lambda_function_name}")
 
-    return response_output
+        response = lambda_client.invoke(
+            FunctionName=lambda_function_name,
+            InvocationType="RequestResponse",
+            Payload=json.dumps(payload)
+        )
 
+        response_output = json.loads(response["Payload"].read().decode("utf-8"))
+        safe_log("Lambda response received")
 
-def header():
-    """
-    App Header setting
-    """
-    # --- Set up the page ---
+        return response_output
+
+    except Exception as e:
+        safe_log(f"Error getting response: {str(e)}")
+        raise
+
+def header() -> None:
+    """Configure secure app header."""
+    # Set secure page config
     st.set_page_config(
         page_title="security-advisory-assistant",
         page_icon=":computer:",
         layout="centered",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': "Security Advisory Assistant"
+        }
     )
 
-    # Creating two columns, logo on the left and title on the right
-    col1, col2 = st.columns(
-        [1, 3]
-    )  # The ratio between columns can be adjusted as needed
+    # Add security headers
+    for header, value in SecurityConfig.SECURE_HEADERS.items():
+        st.markdown(f"<meta http-equiv='{header}' content='{value}'>", unsafe_allow_html=True)
+
+    # Create layout
+    col1, col2 = st.columns([1, 3])
 
     with col1:
         try:
             st.image(
                 "./cna_guru_example.png",
                 width=150,
+                output_format="PNG"  # Enforce PNG format
             )
         except Exception as e:
-            st.write("🤖")  # Fallback emoji if image is missing
-            logger.warning(f"Could not load image: {e}")
+            st.write("🤖")
+            safe_log(f"Image load error: {str(e)}")
 
     with col2:
         st.markdown("Ask me questions. Share my wisdom.")
@@ -79,88 +96,104 @@ def header():
     st.write("#### describe your vulnerability")
     st.write("-----")
 
-
-def initialization():
-    """
-    Initialize sesstion_state variablesß
-    """
-    # --- Initialize session_state ---
+def initialization() -> None:
+    """Initialize secure session state."""
     if "session_id" not in st.session_state:
-        st.session_state.session_id = str(datetime.now()).replace(" ", "_")
+        # Create new secure session
+        st.session_state.session_id = session_manager.create_session()
         st.session_state.questions = []
         st.session_state.answers = []
 
     if "temp" not in st.session_state:
         st.session_state.temp = ""
 
-    # Initialize cache in session state
     if "cache" not in st.session_state:
         st.session_state.cache = {}
 
+def show_message() -> None:
+    """Display messages with security controls."""
+    # Get user input
+    user_input = st.text_input(
+        "# **Question:** 👇",
+        "",
+        key="input",
+        max_chars=SecurityConfig.MAX_INPUT_LENGTH
+    )
 
-def show_message():
-    """
-    Show user question and answers
-    """
-
-    # --- Start the session when there is user input ---
-    user_input = st.text_input("# **Question:** 👇", "", key="input")
-
-    print(f"user_input: {user_input}")
-    # Start a new conversation
+    # New conversation button
     new_conversation = st.button(
-        "New Conversation", key="clear", on_click=clear_input)
+        "New Conversation",
+        key="clear",
+        on_click=clear_input
+    )
+
     if new_conversation:
-        st.session_state.session_id = str(datetime.now()).replace(" ", "_")
+        # End old session
+        if "session_id" in st.session_state:
+            session_manager.end_session(st.session_state.session_id)
+
+        # Create new session
+        st.session_state.session_id = session_manager.create_session()
         st.session_state.user_input = ""
+        st.session_state.questions = []
+        st.session_state.answers = []
 
     if user_input:
         session_id = st.session_state.session_id
+
+        # Validate session
+        if not session_manager.validate_session(session_id):
+            st.error("Session expired. Please start a new conversation.")
+            return
+
         with st.spinner("Asking the security-advisory-assistant..."):
-            vertical_space = show_empty_container()
-            vertical_space.empty()
-            response_output = get_response(user_input, session_id)
-            # response = get_agent_response(streaming_response)
+            try:
+                vertical_space = show_empty_container()
+                vertical_space.empty()
 
-            st.write("-------")
-            source = 'output["source"]'
-            if source.startswith("SELECT"):
-                source = f"_{source}_"
-            # else:
-            #     source = source.replace('\n', '\n\n')
-            source_title = "\n\n **Source**:" + "\n\n" + response_output["source"]
-            answer = "**Answer**: \n\n" + response_output["answer"]
-            st.session_state.questions.append(user_input)
-            st.session_state.answers.append(answer + source_title)
+                response_output = get_response(user_input, session_id)
 
-    if st.session_state["answers"]:
+                st.write("-------")
+
+                source = response_output.get("source", "")
+                if source and source.startswith("SELECT"):
+                    source = f"_{source}_"
+
+                source_title = "\n\n **Source**:" + "\n\n" + source
+                answer = "**Answer**: \n\n" + response_output.get("answer", "")
+
+                st.session_state.questions.append(user_input)
+                st.session_state.answers.append(answer + source_title)
+
+            except Exception as e:
+                safe_log(f"Error processing message: {str(e)}")
+                st.error("An error occurred processing your request.")
+
+    if st.session_state.get("answers"):
         for i in range(len(st.session_state["answers"]) - 1, -1, -1):
             with st.chat_message(
                 name="human",
-                avatar="https://api.dicebear.com/7.x/notionists-neutral/svg?seed=Felix",
+                avatar=os.environ.get("HUMAN_AVATAR", "default_avatar.png")
             ):
                 st.markdown(st.session_state["questions"][i])
 
             with st.chat_message(
                 name="ai",
-                avatar="https://assets-global.website-files.com/62b1b25a5edaf66f5056b068/62d1345ba688202d5bfa6776_aws-sagemaker-eyecatch-e1614129391121.png",
+                avatar=os.environ.get("AI_AVATAR", "default_ai_avatar.png")
             ):
                 st.markdown(st.session_state["answers"][i])
 
+def main() -> None:
+    """Run Streamlit app with security controls."""
+    try:
+        header()
+        initialization()
+        show_message()
+        show_footer()
 
-def main():
-    """
-    Streamlit APP
-    """
-    # --- Section 1 ---
-    header()
-    # --- Section 2 ---
-    initialization()
-    # --- Section 3 ---
-    show_message()
-    # --- Foot Section ---
-    show_footer()
-
+    except Exception as e:
+        safe_log(f"Application error: {str(e)}")
+        st.error("An error occurred. Please try again later.")
 
 if __name__ == "__main__":
     main()

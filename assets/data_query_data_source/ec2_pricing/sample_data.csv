@@ -1,0 +1,11 @@
+instance_type,price_per_hour,memory_gb,vcpu_count,gpu_count
+ml.m5.xlarge,0.23,16,4,0
+ml.m5.2xlarge,0.46,32,8,0
+ml.m5.4xlarge,0.92,64,16,0
+ml.p3.2xlarge,3.06,16,8,1
+ml.p3.8xlarge,12.24,64,32,4
+ml.g4dn.xlarge,0.736,16,4,1
+ml.g4dn.2xlarge,0.94,32,8,1
+ml.g4dn.4xlarge,1.505,64,16,1
+ml.g4dn.8xlarge,2.72,128,32,1
+ml.g4dn.16xlarge,5.44,256,64,1
