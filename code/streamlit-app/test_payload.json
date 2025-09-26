@@ -1,0 +1,6 @@
+{
+  "body": {
+    "query": "What is a SQL injection vulnerability?",
+    "session_id": "test-session-123"
+  }
+}

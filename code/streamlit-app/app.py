@@ -151,15 +151,33 @@ def show_message() -> None:
 
                 st.write("-------")
 
-                source = response_output.get("source", "")
-                if source and source.startswith("SELECT"):
-                    source = f"_{source}_"
+                # Handle potential error responses
+                if "error" in response_output:
+                    st.error(f"Error: {response_output.get('error', 'Unknown error')}")
+                    return
 
-                source_title = "\n\n **Source**:" + "\n\n" + source
-                answer = "**Answer**: \n\n" + response_output.get("answer", "")
+                # Extract answer and source with better validation
+                answer_text = response_output.get("answer", "")
+                source_text = response_output.get("source", "")
+
+                # Check if we got a valid response
+                if not answer_text:
+                    st.error(
+                        "No response received from the assistant. Please try again."
+                    )
+                    return
+
+                # Format source
+                if source_text and source_text.startswith("SELECT"):
+                    source_text = f"_{source_text}_"
+
+                # Build complete response
+                formatted_answer = "**Answer**: \n\n" + answer_text
+                if source_text:
+                    formatted_answer += "\n\n **Source**:" + "\n\n" + source_text
 
                 st.session_state.questions.append(user_input)
-                st.session_state.answers.append(answer + source_title)
+                st.session_state.answers.append(formatted_answer)
 
             except Exception as e:
                 safe_log(f"Error processing message: {str(e)}")
@@ -169,13 +187,11 @@ def show_message() -> None:
         for i in range(len(st.session_state["answers"]) - 1, -1, -1):
             with st.chat_message(
                 name="human",
-                avatar=os.environ.get("HUMAN_AVATAR", "default_avatar.png"),
+                avatar="👤",
             ):
                 st.markdown(st.session_state["questions"][i])
 
-            with st.chat_message(
-                name="ai", avatar=os.environ.get("AI_AVATAR", "default_ai_avatar.png")
-            ):
+            with st.chat_message(name="ai", avatar="🤖"):
                 st.markdown(st.session_state["answers"][i])
 
 
@@ -189,7 +205,14 @@ def main() -> None:
 
     except Exception as e:
         safe_log(f"Application error: {str(e)}")
-        st.error("An error occurred. Please try again later.")
+        # Show more detailed error information for debugging
+        st.error(f"An error occurred: {str(e)}")
+        st.error("Check the logs for more details.")
+        # Also print to console for debugging
+        print(f"DEBUG - Application error: {str(e)}")
+        import traceback
+
+        print(f"DEBUG - Traceback: {traceback.format_exc()}")
 
 
 if __name__ == "__main__":

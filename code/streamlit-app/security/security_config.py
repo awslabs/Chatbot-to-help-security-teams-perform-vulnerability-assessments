@@ -1,7 +1,9 @@
-"""Security configuration and utilities."""
+"""Security configuration and utilities"""
+
 import os
 import re
 import secrets
+import streamlit as st
 from datetime import datetime, timedelta
 import logging
 from typing import Optional, Dict, Any
@@ -10,23 +12,39 @@ from typing import Optional, Dict, Any
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
 class SecurityConfig:
     """Security configuration settings."""
-    MAX_INPUT_LENGTH = int(os.getenv('MAX_INPUT_LENGTH', '1000'))
+
+    MAX_INPUT_LENGTH = int(os.getenv("MAX_INPUT_LENGTH", "1000"))
     ALLOWED_CHARS_PATTERN = r'^[\w\s\-\.,\?!@#$%^&*()+=\[\]{}|\\:;"\'<>\/]+$'
-    SESSION_TIMEOUT = int(os.getenv('SESSION_TIMEOUT', '3600'))  # 1 hour
-    MAX_RETRIES = int(os.getenv('MAX_RETRIES', '3'))
+    SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT", "3600"))  # 1 hour
+    MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
     SECURE_HEADERS = {
-        'X-Frame-Options': 'DENY',
-        'X-Content-Type-Options': 'nosniff',
-        'X-XSS-Protection': '1; mode=block',
-        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-        'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline';"
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1; mode=block",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+        "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline';",
     }
     ALLOWED_SQL_KEYWORDS = {
-        'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'IN', 'LIKE', 'LIMIT',
-        'ORDER', 'BY', 'ASC', 'DESC', 'GROUP', 'HAVING', 'JOIN'
+        "SELECT",
+        "FROM",
+        "WHERE",
+        "AND",
+        "OR",
+        "IN",
+        "LIKE",
+        "LIMIT",
+        "ORDER",
+        "BY",
+        "ASC",
+        "DESC",
+        "GROUP",
+        "HAVING",
+        "JOIN",
     }
+
 
 class InputValidator:
     """Input validation utilities."""
@@ -77,11 +95,14 @@ class InputValidator:
             query_upper = query.upper()
 
             # Extract all words from query
-            query_words = set(re.findall(r'\b\w+\b', query_upper))
+            query_words = set(re.findall(r"\b\w+\b", query_upper))
 
             # Check if all words are in allowed keywords
-            sql_words = {word for word in query_words
-                        if word not in {'AND', 'OR', 'IN', 'THE', 'AS', 'ON'}}
+            sql_words = {
+                word
+                for word in query_words
+                if word not in {"AND", "OR", "IN", "THE", "AS", "ON"}
+            }
 
             if not sql_words.issubset(SecurityConfig.ALLOWED_SQL_KEYWORDS):
                 invalid_words = sql_words - SecurityConfig.ALLOWED_SQL_KEYWORDS
@@ -89,12 +110,12 @@ class InputValidator:
                 return False
 
             # Prevent multiple statements
-            if ';' in query:
+            if ";" in query:
                 logger.warning("Query contains multiple statements")
                 return False
 
             # Prevent comments
-            if '--' in query or '/*' in query:
+            if "--" in query or "/*" in query:
                 logger.warning("Query contains comments")
                 return False
 
@@ -104,11 +125,14 @@ class InputValidator:
             logger.error(f"Error validating SQL query: {str(e)}")
             return False
 
+
 class SessionManager:
-    """Secure session management."""
+    """Secure session management using Streamlit's persistent session state."""
 
     def __init__(self):
-        self.sessions: Dict[str, Dict[str, datetime]] = {}
+        # Initialize session storage in Streamlit's session state
+        if "session_storage" not in st.session_state:
+            st.session_state.session_storage = {}
 
     def create_session(self) -> str:
         """
@@ -118,15 +142,20 @@ class SessionManager:
             str: New session ID
         """
         session_id = secrets.token_urlsafe(32)
-        self.sessions[session_id] = {
-            'created_at': datetime.now(),
-            'last_accessed': datetime.now()
+
+        # Store session in Streamlit's persistent session state
+        st.session_state.session_storage[session_id] = {
+            "created_at": datetime.now(),
+            "last_accessed": datetime.now(),
         }
+
+        logger.info(f"Created new session: {session_id}")
         return session_id
 
     def validate_session(self, session_id: str) -> bool:
         """
         Validate a session ID and update last accessed time.
+        Auto-recreates session if it doesn't exist to handle app restarts gracefully.
 
         Args:
             session_id: The session ID to validate
@@ -135,25 +164,41 @@ class SessionManager:
             bool: True if valid, False otherwise
         """
         try:
-            if session_id not in self.sessions:
-                logger.warning(f"Invalid session ID: {session_id}")
-                return False
+            # Initialize session storage if not exists
+            if "session_storage" not in st.session_state:
+                st.session_state.session_storage = {}
 
-            session = self.sessions[session_id]
+            # If session doesn't exist, create it (handles app restart gracefully)
+            if session_id not in st.session_state.session_storage:
+                logger.info(f"Session not found, recreating: {session_id}")
+                st.session_state.session_storage[session_id] = {
+                    "created_at": datetime.now(),
+                    "last_accessed": datetime.now(),
+                }
+                return True
+
+            session = st.session_state.session_storage[session_id]
 
             # Check session timeout
-            if datetime.now() - session['last_accessed'] > timedelta(seconds=SecurityConfig.SESSION_TIMEOUT):
+            if datetime.now() - session["last_accessed"] > timedelta(
+                seconds=SecurityConfig.SESSION_TIMEOUT
+            ):
                 logger.info(f"Session timed out: {session_id}")
-                del self.sessions[session_id]
+                del st.session_state.session_storage[session_id]
                 return False
 
             # Update last accessed time
-            session['last_accessed'] = datetime.now()
+            session["last_accessed"] = datetime.now()
             return True
 
         except Exception as e:
             logger.error(f"Error validating session: {str(e)}")
-            return False
+            # On error, create new session to recover gracefully
+            st.session_state.session_storage[session_id] = {
+                "created_at": datetime.now(),
+                "last_accessed": datetime.now(),
+            }
+            return True
 
     def end_session(self, session_id: str) -> None:
         """
@@ -163,11 +208,15 @@ class SessionManager:
             session_id: The session ID to end
         """
         try:
-            if session_id in self.sessions:
-                del self.sessions[session_id]
+            if (
+                "session_storage" in st.session_state
+                and session_id in st.session_state.session_storage
+            ):
+                del st.session_state.session_storage[session_id]
                 logger.info(f"Session ended: {session_id}")
         except Exception as e:
             logger.error(f"Error ending session: {str(e)}")
+
 
 def safe_log(message: str, sensitive: bool = False) -> None:
     """
@@ -178,7 +227,7 @@ def safe_log(message: str, sensitive: bool = False) -> None:
         sensitive: Whether the message contains sensitive data
     """
     try:
-        if sensitive and not os.getenv('DEBUG'):
+        if sensitive and not os.getenv("DEBUG"):
             # Log placeholder for sensitive data
             logger.info("Sensitive data logged in debug mode only")
             return

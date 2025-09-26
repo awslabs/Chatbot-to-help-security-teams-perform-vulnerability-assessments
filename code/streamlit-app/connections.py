@@ -23,9 +23,11 @@ if os.environ.get("LAMBDA_FUNCTION_NAME") is None:
             "streamlit_lambda_function_name"
         ]
         lambda_function_name = f"{STACK_NAME}-{STREAMLIT_INVOKE_LAMBDA_FUNCTION_NAME}-{ACCOUNT_ID}-{AWS_REGION}"
-    except Exception:
-        raise ValueError(
-            "LAMBDA_FUNCTION_NAME not found in environment or cdk.json.")
+        print(f"DEBUG - Constructed Lambda function name: {lambda_function_name}")
+        print(f"DEBUG - Account ID: {ACCOUNT_ID}, Region: {AWS_REGION}")
+    except Exception as e:
+        print(f"DEBUG - Error reading cdk.json: {str(e)}")
+        raise ValueError("LAMBDA_FUNCTION_NAME not found in environment or cdk.json.")
 else:
     lambda_function_name = os.environ["LAMBDA_FUNCTION_NAME"]
 
