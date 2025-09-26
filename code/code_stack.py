@@ -6,6 +6,7 @@ from aws_cdk import (
     CustomResource,
     custom_resources as cr,
     CfnResource,
+    CfnParameter,
     Duration,
     Size,
     Stack,
@@ -42,6 +43,15 @@ from bedrock_agent import (
 class CodeStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Add parameter for source IP address
+        self.source_ip_parameter = CfnParameter(
+            self,
+            "SourceIpAddress",
+            type="String",
+            default="0.0.0.0/0",
+            description="Source IP address for security group access (default: 0.0.0.0/0 for all IPs)",
+        )
 
         # Get unique suffixes for the buckets
         self.timestamp = str(int(time.time()))
@@ -949,6 +959,23 @@ class CodeStack(Stack):
             ],
         )
 
+        # Create custom security group with the specified name
+        custom_security_group = ec2.SecurityGroup(
+            self,
+            "ChatBotServiceSecurityGroup",
+            security_group_name="sec-advis-asst-ChatBotServiceSecurityGroup",
+            vpc=vpc,
+            description="Security group for ChatBot service with configurable source IP",
+            allow_all_outbound=True,
+        )
+
+        # Add ingress rule using the parameter value
+        custom_security_group.add_ingress_rule(
+            peer=ec2.Peer.ipv4(self.source_ip_parameter.value_as_string),
+            connection=ec2.Port.tcp(80),
+            description="HTTP access from specified source IP",
+        )
+
         # Create ECS cluster
         cluster = ecs.Cluster(
             self,
@@ -964,7 +991,7 @@ class CodeStack(Stack):
             platform=Platform.LINUX_AMD64,
         )
 
-        #  Create Fargate service
+        #  Create Fargate service with custom security group
         fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self,
             "ChatBotService",
@@ -989,6 +1016,9 @@ class CodeStack(Stack):
                 cpu_architecture=ecs.CpuArchitecture.X86_64,
             ),
         )
+
+        # Apply the custom security group to the load balancer
+        fargate_service.load_balancer.add_security_group(custom_security_group)
         NagSuppressions.add_resource_suppressions(
             fargate_service,
             suppressions=[

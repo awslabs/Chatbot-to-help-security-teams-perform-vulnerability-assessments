@@ -13,6 +13,14 @@
   - [Cost to R\&D](#cost-to-rd)
   - [Next Steps](#next-steps)
   - [Links](#links)
+- [Recent Changes](#recent-changes)
+  - [Latest Updates (Last 5 Commits)](#latest-updates-last-5-commits)
+    - [Streamlit App Update (#8) - Current](#streamlit-app-update-8---current)
+    - [Security Enhancements, Dependency Updates, and Code Quality Improvements (#7)](#security-enhancements-dependency-updates-and-code-quality-improvements-7)
+    - [Dependency Version Updates](#dependency-version-updates)
+    - [Git Configuration Updates](#git-configuration-updates)
+    - [Security Vulnerability Fixes (#6)](#security-vulnerability-fixes-6)
+    - [Infrastructure Enhancement](#infrastructure-enhancement)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Target technology stack](#target-technology-stack)
@@ -89,6 +97,88 @@ The web application is built on [Streamlit](https://streamlit.io/), an open-sour
 
 ![architecture](./assets/diagrams/agent_architecture.png)
 
+```mermaid
+graph TB
+    %% External User
+    User[👤 Security Analyst]
+    
+    %% VPC Boundary
+    subgraph VPC ["🏢 VPC - sec-advis-asst-vpc"]
+        %% Public Subnet
+        subgraph PublicSubnet ["🌐 Public Subnet"]
+            ALB[Application Load Balancer]
+            SG[Security Group]
+        end
+        
+        %% Private Subnet
+        subgraph PrivateSubnet ["🔒 Private Subnet"]
+            ECSCluster[ECS Cluster]
+            Streamlit[Streamlit Fargate Service]
+        end
+    end
+    
+    %% AWS Managed Services
+    subgraph AWSServices ["☁️ AWS Managed Services"]
+        APIGW[API Gateway]
+        
+        subgraph LambdaServices ["⚡ Lambda Functions"]
+            InvokeLambda[Invoke Lambda]
+            ActionLambda[Action Lambda]
+            UpdateLambda[Update Lambda]
+            CreateIndexLambda[Create Index Lambda]
+        end
+        
+        subgraph BedrockServices ["🤖 Amazon Bedrock"]
+            BedrockAgent[Bedrock Agent]
+            KnowledgeBase[Knowledge Base]
+            Claude[Claude 3 Sonnet]
+            TitanEmbed[Titan Embeddings]
+        end
+        
+        subgraph DataServices ["📊 Data & Analytics"]
+            S3KB[S3 Knowledge Base]
+            S3Data[S3 Structured Data]
+            OpenSearch[OpenSearch Serverless]
+            GlueCrawler[Glue Crawler]
+            GlueDB[Glue Database]
+            Athena[Amazon Athena]
+        end
+        
+        subgraph SecurityServices ["🔐 Security & IAM"]
+            KMS[KMS Key]
+            IAMRole[IAM Roles]
+        end
+    end
+    
+    %% Connections
+    User --> ALB
+    ALB --> Streamlit
+    Streamlit --> APIGW
+    APIGW --> InvokeLambda
+    InvokeLambda --> BedrockAgent
+    BedrockAgent --> ActionLambda
+    BedrockAgent --> KnowledgeBase
+    KnowledgeBase --> S3KB
+    KnowledgeBase --> OpenSearch
+    KnowledgeBase --> TitanEmbed
+    ActionLambda --> S3Data
+    ActionLambda --> Athena
+    BedrockAgent --> Claude
+    S3Data --> GlueCrawler
+    GlueCrawler --> GlueDB
+    Athena --> GlueDB
+    UpdateLambda --> GlueCrawler
+    UpdateLambda --> KnowledgeBase
+    CreateIndexLambda --> OpenSearch
+    KMS --> S3KB
+    KMS --> S3Data
+    IAMRole --> BedrockAgent
+    IAMRole --> InvokeLambda
+    SG --> ALB
+    ECSCluster --> Streamlit
+
+```
+
 API Gateway provides the web application and other clients a standard RESTful interface, while shielding the Lambda function that interfaces with the model. This simplifies the client application code that consumes the models. The API Gateway endpoints are publicly accessible in this example, allowing for the possibility to extend this architecture to implement different [API access controls](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html) and integrate with other applications.
 
 In this post, I will walk you through the following steps:
@@ -157,6 +247,47 @@ Overall, great random project from the networking talks at [#vulncon2024](https:
 6. <https://cwe.mitre.org/about/faq.html>
 7. <https://cwe.mitre.org/documents/cwe_usage/mapping_examples.html>
 8. GitHub for project: TBD
+
+# Recent Changes
+
+## Latest Updates (Last 5 Commits)
+
+### Streamlit App Update (#8) - Current
+
+- Enhanced Streamlit application functionality and user interface improvements
+- Updated application components for better user experience
+
+### Security Enhancements, Dependency Updates, and Code Quality Improvements (#7)
+
+- Implemented comprehensive security enhancements across the application
+- Updated dependencies to latest secure versions
+- Applied code quality improvements and best practices
+- Enhanced overall application security posture
+
+### Dependency Version Updates
+
+- Updated requirements.txt file with specific dependency versions
+- Ensured compatibility and security across all Python packages
+- Standardized dependency management for consistent deployments
+
+### Git Configuration Updates
+
+- Updated .gitignore file to exclude additional unnecessary files
+- Improved repository cleanliness and build artifact management
+
+### Security Vulnerability Fixes (#6)
+
+- Resolved 10 critical security vulnerabilities in project dependencies
+- Applied security patches to maintain secure application deployment
+- Updated vulnerable packages to secure versions
+
+### Infrastructure Enhancement
+
+- Added configurable security group support with SourceIpAddress parameter
+- Enhanced CDK deployment to support both specific IP restrictions and open access
+- Security group "sec-advis-asst-ChatBotServiceSecurityGroup" now accepts dynamic IP configuration:
+  - Use `cdk deploy --parameters SourceIpAddress=$(curl -s https://checkip.amazonaws.com)/32` for current IP restriction
+  - Use `cdk deploy` for default open access (0.0.0.0/0)
 
 # Getting Started
 
