@@ -1,6 +1,9 @@
 # Use x86_64 architecture explicitly
 FROM --platform=linux/amd64 public.ecr.aws/lambda/python:3.12
 
+# Cache busting argument
+ARG CACHE_BUST=1
+
 # Install streamlit and other requirements
 WORKDIR /app
 COPY requirements.txt ./requirements.txt
@@ -8,7 +11,8 @@ RUN pip3 install -r requirements.txt --no-cache-dir
 
 # Copy your application code
 COPY *.py ./
-COPY *.png ./ 
+COPY *.png ./
+COPY security/ ./security/
 
 # Expose the Streamlit port
 EXPOSE 8501
