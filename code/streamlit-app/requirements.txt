@@ -1,7 +1,7 @@
 streamlit==1.37.0
-streamlit_chat==0.1.1
-boto3==1.34.57
-PyYAML
+streamlit_chat>=0.1.1
+boto3>=1.40.0
+PyYAML>=6.0.1
 
 # Security vulnerability fixes
 pillow>=10.2.0

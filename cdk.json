@@ -31,7 +31,7 @@
       },
       "names": {
         "stack_name": "sec-advis-asst",
-        "bedrock_agent_name": "chatbotBedrockAgent",
+        "bedrock_agent_name": "chatbotBedrockAgent-${timestamp}",
         "bedrock_agent_alias": "bedrockAgent",
         "streamlit_lambda_function_name": "invokeAgentLambda"
       },

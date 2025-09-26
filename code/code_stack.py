@@ -42,19 +42,16 @@ from bedrock_agent import (
 class CodeStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
+
         # Get unique suffixes for the buckets
         self.timestamp = str(int(time.time()))
         # self.unique_id = f"{Names.unique_id(self)}"[:5]
-        
+
         config = self.get_config()
         logging_context = config["logging"]
         kms_key = self.create_kms_key()
-        agent_assets_bucket, athena_bucket = self.create_data_source_bucket(
-            kms_key)
+        agent_assets_bucket, athena_bucket = self.create_data_source_bucket(kms_key)
         self.upload_files_to_s3(agent_assets_bucket, athena_bucket, kms_key)
-        
-        
 
         self.lambda_runtime = lambda_.Runtime.PYTHON_3_12
         boto3_layer = self.create_lambda_layer("boto3_layer")
@@ -95,7 +92,6 @@ class CodeStack(Stack):
         self.create_streamlit_app(logging_context, agent, invoke_lambda)
 
     def get_config(self):
-
         config = dict(self.node.try_get_context("config"))
 
         self.ASSETS_FOLDER_NAME = config["paths"]["assets_folder_name"]
@@ -111,7 +107,11 @@ class CodeStack(Stack):
             "agent_schema_destination_prefix"
         ]
 
-        self.BEDROCK_AGENT_NAME = config["names"]["bedrock_agent_name"]
+        # Replace timestamp placeholder in agent name to ensure uniqueness
+        agent_name_template = config["names"]["bedrock_agent_name"]
+        self.BEDROCK_AGENT_NAME = agent_name_template.replace(
+            "${timestamp}", self.timestamp
+        )
         self.BEDROCK_AGENT_ALIAS = config["names"]["bedrock_agent_alias"]
         self.STREAMLIT_INVOKE_LAMBDA_FUNCTION_NAME = config["names"][
             "streamlit_lambda_function_name"
@@ -161,7 +161,6 @@ class CodeStack(Stack):
         return kms_key
 
     def create_data_source_bucket(self, kms_key):
-    
         # creating kendra source bucket
         agent_assets_bucket = s3.Bucket(
             self,
@@ -230,22 +229,24 @@ class CodeStack(Stack):
             retain_on_delete=True,
         )
 
-        s3deploy.BucketDeployment(
-            self,
-            "AthenaDataDeployment",
-            sources=[
-                s3deploy.Source.asset(
-                    path.join(
-                        os.getcwd(),
-                        self.ASSETS_FOLDER_NAME,
-                        self.ATHENA_DATA_DESTINATION_PREFIX,
+        (
+            s3deploy.BucketDeployment(
+                self,
+                "AthenaDataDeployment",
+                sources=[
+                    s3deploy.Source.asset(
+                        path.join(
+                            os.getcwd(),
+                            self.ASSETS_FOLDER_NAME,
+                            self.ATHENA_DATA_DESTINATION_PREFIX,
+                        )
                     )
-                )
-            ],
-            destination_bucket=athena_bucket,
-            retain_on_delete=True,
-            destination_key_prefix=self.ATHENA_DATA_DESTINATION_PREFIX,
-        ),
+                ],
+                destination_bucket=athena_bucket,
+                retain_on_delete=True,
+                destination_key_prefix=self.ATHENA_DATA_DESTINATION_PREFIX,
+            ),
+        )
 
         s3deploy.BucketDeployment(
             self,
@@ -361,7 +362,6 @@ class CodeStack(Stack):
         glue_database,
         logging_context,
     ):
-
         ecr_image = lambda_.EcrImageCode.from_asset_image(
             directory=path.join(
                 os.getcwd(), self.LAMBDAS_SOURCE_FOLDER, "action-lambda"
@@ -513,8 +513,7 @@ class CodeStack(Stack):
         )
 
         # Attach the custom policy to the role
-        create_index_lambda_execution_role.add_to_policy(
-            opensearch_policy_statement)
+        create_index_lambda_execution_role.add_to_policy(opensearch_policy_statement)
 
         # get the role arn
         create_index_lambda_execution_role_arn = (
@@ -675,12 +674,12 @@ class CodeStack(Stack):
         """
         Create a bedrock agent
         """
-        
+
         s3_bucket_name = agent_assets_bucket.bucket_name
         s3_object_key = f"{self.AGENT_SCHEMA_DESTINATION_PREFIX}/artifacts_schema.json"
 
         kb_name = f"{Aws.STACK_NAME}-BedrockKnowledgeBase-{self.timestamp}"
-        
+
         data_source_name = "BedrockKnowledgeBaseSource"
         text_field = "AMAZON_BEDROCK_TEXT_CHUNK"
         metadata_field = "AMAZON_BEDROCK_METADATA"
@@ -830,7 +829,6 @@ class CodeStack(Stack):
         agent_resource_role_arn,
         boto3_layer,
     ):
-
         # Create IAM role for the update lambda
         lambda_role = iam.Role(
             self,
