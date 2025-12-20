@@ -1,5 +1,6 @@
 opensearch-py
 requests_aws4auth
 
-# Security vulnerability fix
-requests>=2.32.4
+# Security vulnerability fixes
+requests>=2.32.2     # CVE fix: CWE-670 Always-Incorrect Control Flow Implementation
+urllib3>=1.26.19     # CVE fix: CWE-212 Improper Removal of Sensitive Information

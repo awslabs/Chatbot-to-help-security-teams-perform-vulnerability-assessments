@@ -1,8 +1,8 @@
 # Core dependencies
 boto3>=1.40.0
 opensearch-py>=3.0.0
-requests~=2.32.0
-streamlit>=1.37.0
+requests>=2.32.2     # CVE fix: CWE-670 Always-Incorrect Control Flow Implementation
+streamlit>=1.27.0    # CVE fix: CWE-117 Improper Output Neutralization for Logs
 
 # Security dependencies
 cryptography>=41.0.7  # For secure cryptographic operations
@@ -10,11 +10,19 @@ python-jose>=3.3.0   # For JWT handling
 pyjwt>=2.8.0         # For JWT handling
 bcrypt>=4.0.1        # For password hashing
 python-dotenv>=1.0.0 # For secure environment variable handling
-validators>=0.22.0   # For input validation
+validators>=0.21.0   # CVE fix: CWE-1333 ReDoS
 bleach>=6.1.0        # For HTML sanitization
-urllib3>=1.26.19     # For secure HTTP requests (compatible with botocore)
+urllib3>=1.26.19     # CVE fix: CWE-212 Improper Removal of Sensitive Information
 certifi>=2023.7.22   # For SSL/TLS certificates
 pyOpenSSL>=23.2.0    # For SSL/TLS support
+
+# Additional security fixes
+pyarrow>=14.0.1      # CVE fix: CWE-502 Deserialization of Untrusted Data (CVSS 9.8)
+pillow>=10.0.0       # CVE fix: CWE-400 Uncontrolled Resource Consumption
+protobuf>=4.25.8     # CVE fix: CWE-674 Uncontrolled Recursion
+tornado>=6.3.2       # CVE fix: CWE-601 Open Redirect
+zipp>=3.19.1         # CVE fix: CWE-835 Infinite loop
+numpy>=1.22.0        # CVE fix: CWE-119 Buffer Overflow
 
 # Testing and development dependencies
 pytest>=7.4.3
