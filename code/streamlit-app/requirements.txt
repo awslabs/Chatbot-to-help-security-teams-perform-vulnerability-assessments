@@ -1,12 +1,15 @@
-streamlit>=1.27.0    # CVE fix: CWE-117 Improper Output Neutralization for Logs
+streamlit>=1.41.0    # CVE fix: CWE-117 Improper Output Neutralization for Logs
 streamlit_chat>=0.1.1
 boto3>=1.40.0
-PyYAML>=6.0.1
+PyYAML>=6.0.2
 
 # Security vulnerability fixes
-pillow>=10.2.0
-pyarrow>=14.0.1
-protobuf>=4.25.8
-tornado>=6.5.3
+pillow>=10.4.0       # CVE-2024-28219 buffer overflow fix
+pyarrow>=17.0.0      # CVE-2024-52338 arbitrary code execution fix
+protobuf>=5.29.0     # Latest security fixes
+tornado>=6.5.0       # CVE-2024-52804, CVE-2025-67724 fixes
 requests>=2.32.4
 zipp>=3.19.1
+certifi>=2024.8.30   # Certificate validation security
+aiohttp>=3.10.11     # HTTP client security fixes
+jinja2>=3.1.5        # Template injection fixes

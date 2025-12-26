@@ -1,6 +1,7 @@
-opensearch-py
-requests_aws4auth
+opensearch-py>=2.7.1
+requests_aws4auth>=1.3.1
 
-# Security vulnerability fix
-requests>=2.32.4
-urllib3>=2.6.0 # not directly required, pinned by Snyk to avoid a vulnerability
+# Security vulnerability fixes
+requests>=2.32.4     # CVE fixes for certificate validation
+urllib3>=2.2.3       # Latest security patches
+certifi>=2024.8.30   # Root certificate updates
